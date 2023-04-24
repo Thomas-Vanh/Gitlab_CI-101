@@ -12,8 +12,7 @@ services:
       - ./config/config.toml:/etc/gitlab-runner/config.toml
       - ./metrics/gitlab.rb:/etc/gitlab/gitlab.rb
     ports:
-       - 9252:9252
-    
+      - 9252:9252
 
   sonarqube:
     networks:
@@ -27,14 +26,6 @@ services:
       - sonarqube_logs:/opt/sonarqube/logs
     ports:
       - "9000:9000"
-
-  # sonarscanner:
-  #   image: sonarsource/sonar-scanner-cli
-  #   environment:
-  #     - SONAR_HOST_URL="http://localhost:9000"
-  #     - SONAR_SCANNER_OPTS="-Dsonar.projectKey=${YOUR_PROJECT_KEY}" \
-  #     - SONAR_LOGIN="myAuthenticationToken" 
-
 
 volumes:
   sonarqube_conf:
