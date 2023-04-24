@@ -1,0 +1,104 @@
+image: docker:20.10.16-dind
+services:
+  - name: docker:20.10.16-dind
+    entrypoint: ["dockerd-entrypoint.sh", "--tls=false"]
+variables:
+    DOCKER_DRIVER: overlay2
+    DOCKER_HOST: tcp://localhost:2375/
+    DOCKER_TLS_CERTDIR: ""
+cache:
+  paths:
+    - $CI_PROJECT_DIRECTORY/.m2/repository/
+
+stages:
+- build
+- test
+- package
+- release
+- deploy
+
+sonarqube-check:
+  image: maven:3.6.3-jdk-11
+  variables:
+    SONAR_USER_HOME: "${CI_PROJECT_DIR}/.sonar"  # Defines the location of the analysis task cache
+    GIT_DEPTH: "0"  # Tells git to fetch all the branches of the project, required by the analysis task
+  cache:
+    key: "${CI_JOB_NAME}"
+    paths:
+      - .sonar/cache
+  script: 
+    - mvn verify sonar:sonar -Dsonar.projectKey=becode_ci_petclinic_AYck1X01GS7A0FLcdY5_
+  allow_failure: true
+  only:
+    - main
+
+
+maven-build:
+  tags:
+    - docker
+  image: eclipse-temurin:17-jdk-jammy
+  stage: build
+  script:
+  - ./mvnw package 
+  - ./mvnw test-compile
+  artifacts:
+    paths:
+    - target/*
+
+
+maven-test:
+  tags:
+    - docker
+  image: eclipse-temurin:17-jdk-jammy
+  stage: test
+  script:
+  - ./mvnw test
+
+package-job:
+  rules:
+  - if: $CI_COMMIT_TAG
+    when: never                                  # Do not run this job in a tag pipeline
+  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH  # Run this job when commits are pushed or merged to the default branch
+  services:
+    - docker:20.10.16-dind
+  tags:
+    - docker
+  stage: package
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - docker build  -t "$CONTAINER_IMAGE" .
+    - docker push "$CONTAINER_IMAGE"
+
+deploy:
+  rules:
+  - if: $CI_COMMIT_TAG
+    when: never                                  # Do not run this job in a tag pipeline
+  - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH  # Run this job when commits are pushed or merged to the default branch
+  stage: deploy
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+      #docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY_PASSWORD" registry.gitlab.com/becode_ci/petclinic/
+      docker run -d -p 5000:8000 $CONTAINER_IMAGE"
+  environment: production
+
+release-job:
+  stage: release
+  needs:
+    - job: maven-build
+      artifacts: true
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never                                  # Do not run this job when a tag is created manually
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH  # Run this job when commits are pushed or merged to the default branch
+  script:
+    - echo "running release_job for $TAG"
+  release:                                         # See https://docs.gitlab.com/ee/ci/yaml/#release for available properties
+    tag_name: 'v0.$CI_PIPELINE_IID'                # The version is incremented per pipeline.
+    description: 'v0.$CI_PIPELINE_IID'
+    ref: '$CI_COMMIT_SHA'                          # The tag is created from the pipeline SHA.
+
+
+
