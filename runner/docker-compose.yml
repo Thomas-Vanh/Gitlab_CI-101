@@ -1,0 +1,46 @@
+version: "3"
+
+services:
+  gitlab-runner:
+    networks:
+      - monitoring
+    image: gitlab/gitlab-runner
+    restart: always
+    volumes:
+      - gitlab-runner-config:/etc/gitlab-runner
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./config/config.toml:/etc/gitlab-runner/config.toml
+      - ./metrics/gitlab.rb:/etc/gitlab/gitlab.rb
+    ports:
+       - 9252:9252
+    
+
+  sonarqube:
+    networks:
+      - monitoring
+    image: sonarqube:9-community
+    hostname: sonarqube.becode
+    volumes:
+      - sonarqube_conf:/opt/sonarqube/conf
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    ports:
+      - "9000:9000"
+
+  # sonarscanner:
+  #   image: sonarsource/sonar-scanner-cli
+  #   environment:
+  #     - SONAR_HOST_URL="http://localhost:9000"
+  #     - SONAR_SCANNER_OPTS="-Dsonar.projectKey=${YOUR_PROJECT_KEY}" \
+  #     - SONAR_LOGIN="myAuthenticationToken" 
+
+
+volumes:
+  sonarqube_conf:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
+  gitlab-runner-config:
+networks:
+  monitoring:

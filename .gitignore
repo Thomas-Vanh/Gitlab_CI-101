@@ -3,4 +3,4 @@
 
 # Ignore compiled python files
 /converter/*.pyc
-
+/runner/config/config.toml
